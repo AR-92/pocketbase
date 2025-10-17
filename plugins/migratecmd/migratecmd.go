@@ -6,13 +6,13 @@
 // Example usage:
 //
 //	migratecmd.MustRegister(app, app.RootCmd, migratecmd.Config{
-//		TemplateLang: migratecmd.TemplateLangJS, // default to migratecmd.TemplateLangGo
+	//		TemplateLang: migratecmd.TemplateLangGo, // default to migratecmd.TemplateLangGo
 //		Automigrate:  true,
 //		Dir:          "/custom/migrations/dir", // optional template migrations path; default to "pb_migrations" (for JS) and "migrations" (for Go)
 //	})
 //
 //	Note: To allow running JS migrations you'll need to enable first
-//	[jsvm.MustRegister()].
+.
 package migratecmd
 
 import (
@@ -33,15 +33,14 @@ import (
 type Config struct {
 	// Dir specifies the directory with the user defined migrations.
 	//
-	// If not set it fallbacks to a relative "pb_data/../pb_migrations" (for js)
-	// or "pb_data/../migrations" (for go) directory.
+	// If not set it fallbacks to a relative "pb_data/../migrations" directory.
 	Dir string
 
 	// Automigrate specifies whether to enable automigrations.
 	Automigrate bool
 
 	// TemplateLang specifies the template language to use when
-	// generating migrations - js or go (default).
+	// generating migrations - go (default).
 	TemplateLang string
 }
 
@@ -66,11 +65,7 @@ func Register(app core.App, rootCmd *cobra.Command, config Config) error {
 	}
 
 	if p.config.Dir == "" {
-		if p.config.TemplateLang == TemplateLangJS {
-			p.config.Dir = filepath.Join(p.app.DataDir(), "../pb_migrations")
-		} else {
-			p.config.Dir = filepath.Join(p.app.DataDir(), "../migrations")
-		}
+		template, templateErr = p.goBlankTemplate()
 	}
 
 	// attach the migrate command
@@ -166,11 +161,7 @@ func (p *plugin) migrateCreateHandler(template string, args []string, interactiv
 	// get default create template
 	if template == "" {
 		var templateErr error
-		if p.config.TemplateLang == TemplateLangJS {
-			template, templateErr = p.jsBlankTemplate()
-		} else {
-			template, templateErr = p.goBlankTemplate()
-		}
+		template, templateErr = p.goBlankTemplate()
 		if templateErr != nil {
 			return "", fmt.Errorf("failed to resolve create template: %v", templateErr)
 		}
@@ -204,11 +195,7 @@ func (p *plugin) migrateCollectionsHandler(args []string, interactive bool) (str
 
 	var template string
 	var templateErr error
-	if p.config.TemplateLang == TemplateLangJS {
-		template, templateErr = p.jsSnapshotTemplate(collections)
-	} else {
 		template, templateErr = p.goSnapshotTemplate(collections)
-	}
 	if templateErr != nil {
 		return "", fmt.Errorf("failed to resolve template: %v", templateErr)
 	}

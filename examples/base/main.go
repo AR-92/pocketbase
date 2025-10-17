@@ -10,7 +10,6 @@ import (
 	"github.com/pocketbase/pocketbase/apis"
 	"github.com/pocketbase/pocketbase/core"
 	"github.com/pocketbase/pocketbase/plugins/ghupdate"
-	"github.com/pocketbase/pocketbase/plugins/jsvm"
 	"github.com/pocketbase/pocketbase/plugins/migratecmd"
 	"github.com/pocketbase/pocketbase/tools/hook"
 	"github.com/pocketbase/pocketbase/tools/osutils"
@@ -44,7 +43,7 @@ func main() {
 		&hooksPool,
 		"hooksPool",
 		15,
-		"the total prewarm goja.Runtime instances for the JS app hooks execution",
+		"the total prewarm instances for app hooks execution",
 	)
 
 	var migrationsDir string
@@ -84,14 +83,6 @@ func main() {
 	// ---------------------------------------------------------------
 	// Plugins and hooks:
 	// ---------------------------------------------------------------
-
-	// load jsvm (pb_hooks and pb_migrations)
-	jsvm.MustRegister(app, jsvm.Config{
-		MigrationsDir: migrationsDir,
-		HooksDir:      hooksDir,
-		HooksWatch:    hooksWatch,
-		HooksPoolSize: hooksPool,
-	})
 
 	// migrate command (with js templates)
 	migratecmd.MustRegister(app, app.RootCmd, migratecmd.Config{

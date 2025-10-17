@@ -45,11 +45,7 @@ func (p *plugin) automigrateOnCollectionChange(e *core.CollectionRequestEvent) e
 
 	var template string
 	var templateErr error
-	if p.config.TemplateLang == TemplateLangJS {
-		template, templateErr = p.jsDiffTemplate(new, old)
-	} else {
-		template, templateErr = p.goDiffTemplate(new, old)
-	}
+	template, templateErr = p.goDiffTemplate(new, old)
 	if templateErr != nil {
 		if errors.Is(templateErr, ErrEmptyTemplate) {
 			return nil // no changes

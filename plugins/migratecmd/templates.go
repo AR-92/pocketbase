@@ -17,7 +17,6 @@ const (
 	TemplateLangJS = "js"
 	TemplateLangGo = "go"
 
-	// note: this usually should be configurable similar to the jsvm plugin,
 	// but for simplicity is static as users can easily change the
 	// reference path if they use custom dirs structure
 	jsTypesDirective = `/// <reference path="../pb_data/types.d.ts" />` + "\n"
