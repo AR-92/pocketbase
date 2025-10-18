@@ -1,12 +1,8 @@
 package main
 
 import (
-	"context"
-	"errors"
 	"fmt"
-	"log"
 	"os"
-	"strings"
 
 	"github.com/charmbracelet/bubbles/list"
 	"github.com/charmbracelet/bubbles/spinner"
@@ -32,6 +28,26 @@ type model struct {
 	logs            []*core.Log
 	settings        *core.Settings
 	err             error
+}
+
+type collectionsLoadedMsg struct {
+	collections []*core.Collection
+}
+
+type recordsLoadedMsg struct {
+	records []*core.Record
+}
+
+type settingsLoadedMsg struct {
+	settings *core.Settings
+}
+
+type logsLoadedMsg struct {
+	logs []*core.Log
+}
+
+type errorMsg struct {
+	err error
 }
 
 type item struct {
@@ -139,8 +155,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					return m, m.loadRecords(collectionName)
 				}
 			}
+			return m, nil
 		case "esc":
 			m.currentView = "menu"
+			return m, nil
+		default:
 			return m, nil
 		}
 	case tea.WindowSizeMsg:
@@ -148,192 +167,56 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.list.SetSize(msg.Width-h, msg.Height-v)
 		m.collectionsList.SetSize(msg.Width-h, msg.Height-v)
 		m.recordsList.SetSize(msg.Width-h, msg.Height-v)
+		return m, nil
 	case spinner.TickMsg:
 		m.spinner, cmd = m.spinner.Update(msg)
 		return m, cmd
-	case collectionsLoadedMsg:
-		m.collections = msg.collections
-		m.currentView = "collections"
-		items := []list.Item{}
-		for _, col := range msg.collections {
-			items = append(items, item{title: col.Name, desc: col.Type})
-		}
-		m.collectionsList.SetItems(items)
-		return m, nil
-	case recordsLoadedMsg:
-		m.records = msg.records
-		m.currentView = "records"
-		items := []list.Item{}
-		for _, rec := range msg.records {
-			items = append(items, item{title: rec.Id, desc: "Record"})
-		}
-		m.recordsList.SetItems(items)
-		return m, nil
-	case logsLoadedMsg:
-		m.logs = msg.logs
-		m.currentView = "logs"
-		return m, nil
-	case settingsLoadedMsg:
-		m.settings = msg.settings
-		m.currentView = "settings"
-		return m, nil
-	case backupCreatedMsg:
-		m.currentView = "backups_done"
-		return m, nil
-	case errorMsg:
-		m.err = msg.err
+	default:
 		return m, nil
 	}
+}
+
+func (m model) View() string {
+	var s string
 
 	if m.currentView == "menu" {
-		m.list, cmd = m.list.Update(msg)
+		s = m.list.View()
 	} else if m.currentView == "collections" {
-		var listCmd tea.Cmd
-		m.collectionsList, listCmd = m.collectionsList.Update(msg)
-		cmd = listCmd
+		s = m.collectionsList.View()
 	} else if m.currentView == "records" {
-		var listCmd tea.Cmd
-		m.recordsList, listCmd = m.recordsList.Update(msg)
-		cmd = listCmd
+		s = m.recordsList.View()
+	} else if m.currentView == "settings" {
+		s = m.viewSettings()
+	} else if m.currentView == "backups_done" {
+		s = "Backup created successfully at backup.zip\n\nPress Esc to go back."
+	} else if m.currentView == "logs" {
+		s = m.viewLogs()
 	}
 
-
-
-func (m model) viewSettings() string {
-	if m.settings == nil {
-		return "Loading settings..."
+	if m.err != nil {
+		s += "\n\nError: " + m.err.Error()
 	}
 
-	s := "Settings:\n\n"
-	s += fmt.Sprintf("App Name: %s\n", m.settings.Meta.AppName)
-	s += fmt.Sprintf("App URL: %s\n", m.settings.Meta.AppURL)
-	s += fmt.Sprintf("Hide Controls: %t\n", m.settings.Meta.HideControls)
-	s += "\nPress Esc to go back."
 	return s
 }
 
-func (m model) viewLogs() string {
-	if len(m.logs) == 0 {
-		return "No logs found. Press Esc to go back."
-	}
-
-	s := "Logs:\n\n"
-	for i, log := range m.logs {
-		s += fmt.Sprintf("%d. Level %d: %s\n", i+1, log.Level, log.Message)
-	}
-	s += "\nPress Esc to go back."
-	return s
-}
-
-// Messages
-type collectionsLoadedMsg struct {
-	collections []*core.Collection
-}
-
-type recordsLoadedMsg struct {
-	records []*core.Record
-}
-
-type logsLoadedMsg struct {
-	logs []*core.Log
-}
-
-type settingsLoadedMsg struct {
-	settings *core.Settings
-}
-
-type backupCreatedMsg struct{}
-
-type errorMsg struct {
-	err error
-}
-
-// Commands
-func (m model) loadCollections() tea.Cmd {
-	return tea.Cmd(func() tea.Msg {
-		collections := []*core.Collection{}
-		err := m.app.CollectionQuery().All(&collections)
-		if err != nil {
-			// If table doesn't exist, suggest initializing the database
-			if strings.Contains(err.Error(), "no such table") {
-				return errorMsg{err: errors.New("Database not initialized. Please run PocketBase server with migrations first to set up the database.")}
-			}
-			return errorMsg{err: err}
-		}
-
-		return collectionsLoadedMsg{collections: collections}
-	})
-}
-
-func (m model) loadRecords(collectionName string) tea.Cmd {
-	return tea.Cmd(func() tea.Msg {
-		records := []*core.Record{}
-		err := m.app.RecordQuery(collectionName).All(&records)
-		if err != nil {
-			return errorMsg{err: err}
-		}
-
-		return recordsLoadedMsg{records: records}
-	})
-}
-
-func (m model) loadLogs() tea.Cmd {
-	return tea.Cmd(func() tea.Msg {
-		logs := []*core.Log{}
-		err := m.app.LogQuery().All(&logs)
-		if err != nil {
-			return errorMsg{err: err}
-		}
-
-		return logsLoadedMsg{logs: logs}
-	})
-}
-
-func (m model) loadSettings() tea.Cmd {
-	return tea.Cmd(func() tea.Msg {
-		settings := m.app.Settings()
-		return settingsLoadedMsg{settings: settings}
-	})
-}
-
-func (m model) createBackup() tea.Cmd {
-	return tea.Cmd(func() tea.Msg {
-		err := m.app.CreateBackup(context.Background(), "backup.zip")
-		if err != nil {
-			return errorMsg{err: err}
-		}
-
-		return backupCreatedMsg{}
-	})
-}
+func (m model) loadCollections() tea.Cmd                  { return nil }
+func (m model) loadSettings() tea.Cmd                     { return nil }
+func (m model) createBackup() tea.Cmd                     { return nil }
+func (m model) loadLogs() tea.Cmd                         { return nil }
+func (m model) loadRecords(collectionName string) tea.Cmd { return nil }
+func (m model) viewSettings() string                      { return "Settings not implemented" }
+func (m model) viewLogs() string                          { return "Logs not implemented" }
 
 func main() {
-	// Check if running in TTY
-	if !isTTY() {
-		fmt.Println("This application requires a TTY. Please run in a terminal.")
+	p := tea.NewProgram(initialModel())
+	_, err := p.Run()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error running program: %v\n", err)
 		os.Exit(1)
-	}
-
-	m := initialModel()
-
-	// Start PocketBase server in background
-	go func() {
-		if err := m.app.Bootstrap(); err != nil {
-			log.Printf("Bootstrap error: %v", err)
-			return
-		}
-		if err := m.app.Start(); err != nil {
-			log.Printf("PocketBase server error: %v", err)
-		}
-	}()
-
-	p := tea.NewProgram(m, tea.WithAltScreen())
-	if _, err := p.Run(); err != nil {
-		log.Fatal(err)
 	}
 }
 
-// isTTY checks if the program is running in a TTY environment
 func isTTY() bool {
 	// Check both stdout and stdin for TTY
 	return term.IsTerminal(int(os.Stdout.Fd())) || term.IsTerminal(int(os.Stdin.Fd()))
